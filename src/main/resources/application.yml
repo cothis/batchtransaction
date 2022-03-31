@@ -1,0 +1,32 @@
+spring:
+  batch:
+    jdbc:
+      initialize-schema: always
+      table-prefix: BATCH_
+    job:
+      names: ${JOB_NAMES:createSettleJob}
+      enabled: ${AUTO_RUN:false}
+  datasource:
+    hikari:
+      batch:
+        jdbc-url: jdbc:mysql://localhost:3306/spbatch
+        username: root
+        password: 1234
+        driver-class-name: com.mysql.cj.jdbc.Driver
+      mybatis:
+        jdbc-url: jdbc:mysql://localhost:3306/se
+        username: root
+        password: 1234
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        initialization-mode: always
+  sql:
+    init:
+      schema-locations: classpath:schema.sql
+      mode: always
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  mapper-locations: /mapper/**/*-mapper.xml
+logging:
+  level:
+    com.cothis: info
