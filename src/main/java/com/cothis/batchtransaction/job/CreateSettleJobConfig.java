@@ -1,5 +1,6 @@
 package com.cothis.batchtransaction.job;
 
+import com.cothis.batchtransaction.dao.SettleMapper;
 import com.cothis.batchtransaction.domain.Settle;
 import com.cothis.batchtransaction.service.SettleService;
 import lombok.RequiredArgsConstructor;
@@ -11,12 +12,15 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.step.tasklet.Tasklet;
+import org.springframework.batch.item.*;
+import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -27,16 +31,19 @@ import java.util.stream.IntStream;
 @Slf4j
 public class CreateSettleJobConfig {
 
+    private static final int CHUNK_SIZE = 1000;
     private static final int TEST_DATA_SIZE = 5000;
     private final JobBuilderFactory jobBuilderFactory;
     private final StepBuilderFactory stepBuilderFactory;
     private final SettleService settleService;
+    private final SettleMapper settleMapper;
 
     @Bean
     public Job createSettleJob() {
         return jobBuilderFactory.get("createSettleJob")
                 .incrementer(new RunIdIncrementer())
                 .start(createSettleStep())
+                .next(createChunkStep())
                 .build();
     }
 
@@ -44,6 +51,16 @@ public class CreateSettleJobConfig {
     public Step createSettleStep() {
         return stepBuilderFactory.get("createSettleStep")
                 .tasklet(createSettleTask(null))
+                .build();
+    }
+
+    @Bean
+    public Step createChunkStep() {
+        return stepBuilderFactory.get("createSettleChunkStep")
+                .<Settle, Settle>chunk(CHUNK_SIZE)
+                .reader(settleItemReader())
+                .processor(settleItemProcessor())
+                .writer(settleItemWriter(settleService))
                 .build();
     }
 
@@ -56,9 +73,9 @@ public class CreateSettleJobConfig {
             long startTime = System.currentTimeMillis();
 
             if (createType == CreateType.SIMPLE) {
-                settleService.createSettles(testDatas);
+                settleService.createSettlesSimple(testDatas);
             } else {
-                settleService.createSettlesBulk(testDatas);
+                settleService.createSettlesAllWithBulk(testDatas);
             }
 
             long endTime = System.currentTimeMillis();
@@ -68,10 +85,31 @@ public class CreateSettleJobConfig {
         };
     }
 
+    @Bean
+    public ItemReader<Settle> settleItemReader() {
+        return new ListItemReader<>(createTestData());
+    }
+
+    @Bean
+    public ItemProcessor<Settle, Settle> settleItemProcessor() {
+        return item -> {
+            item.setAmount(BigDecimal.valueOf(Math.random() * 100));
+            return item;
+        };
+    }
+
+    @Bean
+    public ItemWriter<Settle> settleItemWriter(SettleService settleService) {
+        return settles -> {
+            log.info("writer called");
+            settleService.createSettles(settles);
+        };
+    }
+
     private List<Settle> createTestData() {
         String odNo = UUID.randomUUID().toString().substring(0, 8);
         return IntStream.range(1, TEST_DATA_SIZE + 1)
-                .mapToObj(i -> new Settle(odNo, i, BigDecimal.valueOf(Math.random() * 100)))
+                .mapToObj(i -> new Settle(odNo, i))
                 .collect(Collectors.toList());
     }
 

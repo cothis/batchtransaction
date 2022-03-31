@@ -16,5 +16,5 @@ public interface SettleMapper {
     @Insert("INSERT INTO se.settle(od_no, seq, amount) VALUES(#{odNo}, #{seq}, #{amount})")
     void createSettle(Settle settle);
 
-    void createSettles(List<Settle> settles);
+    void createSettles(List<? extends Settle> settles);
 }

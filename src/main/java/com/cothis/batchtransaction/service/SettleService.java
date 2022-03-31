@@ -21,16 +21,21 @@ public class SettleService {
     private static final int CHUNK_SIZE = 1000;
     private final SettleMapper settleMapper;
 
-    public void createSettles(List<Settle> settles) {
+    public void createSettlesSimple(List<Settle> settles) {
         settles.forEach(settleMapper::createSettle);
         throw new IllegalStateException("error");
     }
 
-    public void createSettlesBulk(List<Settle> settles) {
+    public void createSettlesAllWithBulk(List<Settle> settles) {
         AtomicInteger ai = new AtomicInteger();
         Collection<List<Settle>> chunkedDatas = settles.stream()
                 .collect(Collectors.groupingBy(settle -> ai.getAndIncrement() / CHUNK_SIZE))
                 .values();
         chunkedDatas.forEach(settleMapper::createSettles);
+    }
+
+    public void createSettles(List<? extends Settle> settles) {
+        log.info("settle Service");
+        settleMapper.createSettles(settles);
     }
 }
